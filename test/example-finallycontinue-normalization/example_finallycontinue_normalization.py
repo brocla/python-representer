@@ -1,70 +1,72 @@
-from collections import defaultdict
-
-def count_lines(filenames, extensions=("py", "md", "html", "js")):
+class StackUnderflowError(Exception):
+    """Exception raised when Stack is not full.
+       message: explanation of the error.
     """
-        for files with the given extensions:
-          - count lines
-          or
-          - log the failure to open
-    """
+    def __init__(self, message):
+        self.message = message
 
-    counts = defaultdict(int)
 
-    for filename in filenames:
-        ext = filename.suffix.lstrip(".")
+def is_integer(string):
+    try:
+        int(string)
+        return True
+    except ValueError:
+        return False
 
-        if filename.is_dir():
-            continue
 
-        status = 'OK'
+def evaluate(input_data):
+    if not input_data:
+        return []
+    defines = {}
+    while input_data[0][:1] == ':':
+        values = input_data.pop(0).split()
+        values.pop()
+        values.pop(0)
+        key = values.pop(0).lower()
+        if is_integer(key):
+            raise ValueError('illegal operation')
+        defines[key] = [
+                idx
+                for vivaldi in values
+                for idx in defines.get(vivaldi, [vivaldi])
+        ]
+    stack = []
+    input_data = input_data[-1].split()
+    while any(input_data):
+        word = input_data.pop(0).lower()
         try:
-            fp = open(filename)
-
-        except (IOError, IsADirectoryError) as e:
-            status = e.strerror
-
+            if is_integer(word):
+                stack.append(int(word))
+            elif word in defines:
+                input_data = defines[word] + input_data
+            elif word == '+':
+                stack.append(stack.pop() + stack.pop())
+            elif word == '-':
+                stack.append(-stack.pop() + stack.pop())
+            elif word == '*':
+                stack.append(stack.pop() * stack.pop())
+            elif word == '/':
+                divisor = stack.pop()
+                if divisor == 0:
+                    raise ZeroDivisionError('divide by zero')
+                stack.append(int(stack.pop() / divisor))
+            elif word == 'dup':
+                stack.append(stack[-1])
+            elif word == 'drop':
+                stack.pop()
+            elif word == 'swap':
+                stack.append(stack[-2])
+                del stack[-3]
+            elif word == 'over':
+                stack.append(stack[-2])
+            else:
+                raise ValueError('undefined operation')
+        except IndexError as error:
+            raise StackUnderflowError('Insufficient number of items in stack') from error
         finally:
-            # only log '.py' files that fail to open
-            if ext == 'py' and status != 'OK':
-                print("log:",filename, status)
-                fp.close()
+            # DEBUG:  when the stack is empty, ignore any exception, continue the loop.
+            #         otherwise, print a message
+            if not len(stack):
                 continue
-
-            if ext in extensions:
-                for line in fp:
-                    counts[ext] += 1
-            fp.close()
-
-    return counts
-
-
-# This example comes from the Micropython test suite
-# https://github.com/micropython/micropython/blob/master/tests/basics/try_finally_continue.py
-def foo(x):
-    for i in range(x):
-        try:
-            pass
-        finally:
-            try:
-                try:
-                    print(x, i)
-                finally:
-                    try:
-                        1 / 0
-                    finally:
-                        return 42
-            finally:
-                print('continue')
-                continue
-
-
-## Expect
-# foo(4)
-# 4 0
-# continue
-# 4 1
-# continue
-# 4 2
-# continue
-# 4 3
-# continue
+            print(f"Debug, the stack is not empty. word = {word}")
+    return stack
